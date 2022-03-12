@@ -31,7 +31,7 @@ contract CPT is ERC20,Ownable,ERC20Burnable{
         return 1;
     }
    
-    //consumer get token
+    //consumer get token,one address is allowed to get one token/coupon
     function getCoupon(address receipient) external  returns (bool) {
         //check if the receipient is the owner or not
         require(receipient!=owner(),"don't send coupon to the vendor!");
@@ -45,27 +45,20 @@ contract CPT is ERC20,Ownable,ERC20Burnable{
     }
 
 function useCoupon(string memory productName) external returns(bool){
-    //check if productName is not empty
-    require(bytes(productName).length != 0);
+     //do we need to check uint is empty or do a type check here first?
     //check if there is a product in product list
-    Product memory product;
-     for (uint i = 0; i <= products.length; i++) {
-           if( keccak256(abi.encodePacked((products[i].name))) == keccak256(abi.encodePacked((productName)))){
-                product=products[i];
-           }
-           revert('Not found');
-      }
+    require(products[productId]._exist,"product not found");
     //check if the stock of product bigger than 1
-    require(product.stock>=1,"out of stock");
+    require(products[productId].stock>=1,"out of stock");
     //check if the msg.sender has 1 token and not spent yet
     require(balanceOf(msg.sender)==1,"invalid balance!");
     bool spent= consumers[msg.sender].notSpent;
     require(spent,"you have spent your token");
     //add product to consumer
-    consumers[msg.sender].purchasedProdcut=product;
+    consumers[msg.sender].purchasedProdcut=products[productId];
     consumers[msg.sender].notSpent=false;
     //burn the token
-    _burn(msg.sender, 1);
+    burn(1);
    return true;
 }
     //we need to check if the product is already in the contract before we 

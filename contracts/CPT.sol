@@ -20,12 +20,12 @@ contract CPT is ERC20,Ownable,ERC20Burnable{
         uint id;
         uint256 price;
         uint256 stock; 
+        bool _exist;
     }
 
     mapping(address=>Consumer) internal consumers;
-    mapping (uint => uint) productIdToArrayIndex;
-    Product[] public products;
-
+    mapping(uint=>Product) product;
+    uint[] productIdList;
 
     function decimals() public view virtual override returns (uint8) {
         return 1;
@@ -41,21 +41,24 @@ contract CPT is ERC20,Ownable,ERC20Burnable{
         require(balanceOf(owner())>=1,"Not enough coupon!");
        (bool sent) =transfer(receipient,1);
         require(sent, "Failed to buy the coupon");
+        consumers[receipient].notSpent=true;
         return sent;
     }
 
-function useCoupon(string memory productName) external returns(bool){
-     //do we need to check uint is empty or do a type check here first?
-    //check if there is a product in product list
-    require(products[productId]._exist,"product not found");
+function useCoupon(uint productId) external returns(bool){
+    //check if the product is already exist
+    require(product[productId]._exist,"product not found");
     //check if the stock of product bigger than 1
-    require(products[productId].stock>=1,"out of stock");
+    require(product[productId].stock>=1,"out of stock");
     //check if the msg.sender has 1 token and not spent yet
     require(balanceOf(msg.sender)==1,"invalid balance!");
+    //owner should not use coupon
+    require(msg.sender!=owner(),"vendor should not use coupon!");
     bool spent= consumers[msg.sender].notSpent;
     require(spent,"you have spent your token");
+    product[productId].stock-=1;
     //add product to consumer
-    consumers[msg.sender].purchasedProdcut=products[productId];
+    consumers[msg.sender].purchasedProdcut=product[productId];
     consumers[msg.sender].notSpent=false;
     //burn the token
     burn(1);
@@ -64,30 +67,33 @@ function useCoupon(string memory productName) external returns(bool){
     //we need to check if the product is already in the contract before we 
     //put a new product in it. 
     function setProduct(string memory name,uint id,uint256 price,uint256 stock) external onlyOwner {
-        uint arrayIndex=productIdToArrayIndex[id];
-        require(arrayIndex<1,"This product is already exist!");
-      products.push(Product(name,id,price,stock));
-        //when the productIdToArrayIndex[id]=1, mean we have already have this produt
-        //in product list;
-        productIdToArrayIndex[id]=1;
+      require(product[id]._exist==false,"This product is already exist!");
+      //Product memory product=Product(name,id,price,stock,true);
+      product[id]=Product(name,id,price,stock,true);
+      productIdList.push(id);
     }
+
     function getProduct(uint id) public view returns(Product memory){
-        Product memory product;
-       for (uint i = 0; i <= products.length; i++) {
-           if(products[i].id==id){
-               product=products[i];
-               return product;
-           }
-      }
+        if(product[id]._exist){
+            return product[id];
+        }
       revert('Not found');
     }
     
+    //we may not need to handle the fetch of all products in contract
+    //we can do it in the front end by looping the productIdList.
+    function getProductIDList() public view returns(uint[] memory){
+        return productIdList;
+    }
     function getProducts() public view returns (Product[] memory ){
-      Product[] memory Iproducts=new Product[](products.length);
-       for (uint i = 0; i < products.length; i++) {
-          Product memory Iproduct = products[i];
+      Product[] memory Iproducts=new Product[](productIdList.length);
+       for (uint i = 0; i < productIdList.length; i++) {
+          Product memory Iproduct = product[productIdList[i]];
           Iproducts[i] = Iproduct;
       }
       return Iproducts;
+    }
+    function getConsumerInfo(address consumerAdrs) public view returns(Consumer memory){
+        return consumers[consumerAdrs];
     }
 }

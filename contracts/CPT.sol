@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 //the token is used as coupon
 contract CPT is ERC20,Ownable,ERC20Burnable{
    constructor(uint256 initialSupply)  ERC20("TCoupon", "CPT") {
+        require(initialSupply>=0,"supply token number must bigger than 0!");
         _mint(msg.sender, initialSupply);
     }
     //the consumer who get the CPT token can use it to get a discount
@@ -23,16 +24,19 @@ contract CPT is ERC20,Ownable,ERC20Burnable{
         bool _exist;
     }
 
-    mapping(address=>Consumer) internal consumers;
+    mapping(address=>Consumer) consumers;
     mapping(uint=>Product) product;
     uint[] productIdList;
+    
+    event consumerGetCoupon(address indexed receipient,uint tokenAmount,uint256 timeStamp);
 
     function decimals() public view virtual override returns (uint8) {
         return 1;
     }
    
-    //consumer get token,one address is allowed to get one token/coupon
+    //consumer get token,one address is allowed to get one token/coupon only
     function getCoupon(address receipient) external  returns (bool) {
+         require(receipient != address(0), "invalid address");
         //check if the receipient is the owner or not
         require(receipient!=owner(),"don't send coupon to the vendor!");
         //check if address already has token or not
@@ -42,11 +46,12 @@ contract CPT is ERC20,Ownable,ERC20Burnable{
        (bool sent) =transfer(receipient,1);
         require(sent, "Failed to buy the coupon");
         consumers[receipient].notSpent=true;
+        emit consumerGetCoupon(receipient,1,block.timestamp);
         return sent;
     }
 
 function useCoupon(uint productId) external returns(bool){
-    //check if the product is already exist
+    //check if the product exists
     require(product[productId]._exist,"product not found");
     //check if the stock of product bigger than 1
     require(product[productId].stock>=1,"out of stock");
@@ -68,7 +73,6 @@ function useCoupon(uint productId) external returns(bool){
     //put a new product in it. 
     function setProduct(string memory name,uint id,uint256 price,uint256 stock) external onlyOwner {
       require(product[id]._exist==false,"This product is already exist!");
-      //Product memory product=Product(name,id,price,stock,true);
       product[id]=Product(name,id,price,stock,true);
       productIdList.push(id);
     }
@@ -94,6 +98,7 @@ function useCoupon(uint productId) external returns(bool){
       return Iproducts;
     }
     function getConsumerInfo(address consumerAdrs) public view returns(Consumer memory){
+         require(consumerAdrs != address(0), "invalid address");
         return consumers[consumerAdrs];
     }
 }

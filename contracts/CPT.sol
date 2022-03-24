@@ -14,6 +14,7 @@ contract CPT is ERC20,Ownable,ERC20Burnable{
     struct Consumer {
         Product purchasedProdcut; //which product the comsumer purchased
         bool notSpent; //the customer already spent coupon or not
+        address id;
     }
 
     struct Product {
@@ -28,8 +29,9 @@ contract CPT is ERC20,Ownable,ERC20Burnable{
     mapping(uint=>Product) product;
     uint[] productIdList;
     
-    event consumerGetCoupon(address indexed receipient,uint tokenAmount,uint256 timeStamp);
-
+    event couponGet(address indexed receipient,uint tokenAmount,uint256 timeStamp);
+    event couponUsed(Consumer consumer);
+    event productSet(Product product);
     function decimals() public view virtual override returns (uint8) {
         return 1;
     }
@@ -46,7 +48,7 @@ contract CPT is ERC20,Ownable,ERC20Burnable{
        (bool sent) =transfer(receipient,1);
         require(sent, "Failed to buy the coupon");
         consumers[receipient].notSpent=true;
-        emit consumerGetCoupon(receipient,1,block.timestamp);
+        emit couponGet(receipient,1,block.timestamp);
         return sent;
     }
 
@@ -65,8 +67,10 @@ function useCoupon(uint productId) external returns(bool){
     //add product to consumer
     consumers[msg.sender].purchasedProdcut=product[productId];
     consumers[msg.sender].notSpent=false;
+    consumers[msg.sender].id=msg.sender;
     //burn the token
     burn(1);
+    emit couponUsed(consumers[msg.sender]);
    return true;
 }
     //we need to check if the product is already in the contract before we 
@@ -75,6 +79,7 @@ function useCoupon(uint productId) external returns(bool){
       require(product[id]._exist==false,"This product is already exist!");
       product[id]=Product(name,id,price,stock,true);
       productIdList.push(id);
+      emit productSet(product[id]);
     }
 
     function getProduct(uint id) public view returns(Product memory){

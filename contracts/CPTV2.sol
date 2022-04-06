@@ -1,18 +1,15 @@
-/**
-     * @dev this contract factoary allow user create new ERC token after contract deployed
-     * this is a unfinished contract
-     */
-     
-     //SPDX-License-Identifier: MIT
+//SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-contract ERC20 is Context, IERC20, IERC20Metadata {
+contract ERC20 is Context,IERC20, IERC20Metadata {
     mapping(address => uint256) private _balances;
 
     mapping(address => mapping(address => uint256)) private _allowances;
+
+  address private _owner;
 
     uint256 private _totalSupply;
 
@@ -28,9 +25,17 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
      * All two of these values are immutable: they can only be set once during
      * construction.
      */
-    constructor(string memory name_, string memory symbol_) {
+    constructor(string memory name_, string memory symbol_,address owner) {
         _name = name_;
         _symbol = symbol_;
+        _owner=owner;
+    }
+
+/**
+     * @dev Returns the address of the current owner.
+     */
+    function owner() public view virtual returns (address) {
+        return _owner;
     }
 
     /**
@@ -88,8 +93,8 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
      * - the caller must have a balance of at least `amount`.
      */
     function transfer(address to, uint256 amount) public virtual override returns (bool) {
-        address owner = _msgSender();
-        _transfer(owner, to, amount);
+        //address owner = _msgSender();
+        _transfer(owner(), to, amount);
         return true;
     }
 
@@ -111,8 +116,8 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
      * - `spender` cannot be the zero address.
      */
     function approve(address spender, uint256 amount) public virtual override returns (bool) {
-        address owner = _msgSender();
-        _approve(owner, spender, amount);
+        //address owner = _msgSender();
+        _approve(owner(), spender, amount);
         return true;
     }
 
@@ -156,8 +161,8 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
      * - `spender` cannot be the zero address.
      */
     function increaseAllowance(address spender, uint256 addedValue) public virtual returns (bool) {
-        address owner = _msgSender();
-        _approve(owner, spender, allowance(owner, spender) + addedValue);
+        //address owner = _msgSender();
+        _approve(owner(), spender, allowance(owner(), spender) + addedValue);
         return true;
     }
 
@@ -176,11 +181,11 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
      * `subtractedValue`.
      */
     function decreaseAllowance(address spender, uint256 subtractedValue) public virtual returns (bool) {
-        address owner = _msgSender();
-        uint256 currentAllowance = allowance(owner, spender);
+        //address owner = _msgSender();
+        uint256 currentAllowance = allowance(owner(), spender);
         require(currentAllowance >= subtractedValue, "ERC20: decreased allowance below zero");
         unchecked {
-            _approve(owner, spender, currentAllowance - subtractedValue);
+            _approve(owner(), spender, currentAllowance - subtractedValue);
         }
 
         return true;
@@ -360,11 +365,10 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
 }
 
 contract ERC20TokenFactory {
- ERC20  token;
- event Bought(uint256 amount);
-    event Sold(uint256 amount);
+    ERC20 token;
+ 
     function createToken(string memory _name, string memory _symbol, uint256 _totalSupply) public  {
-        token= new ERC20(_name, _symbol);
+        token= new ERC20(_name, _symbol,msg.sender);
         token._mint(msg.sender, _totalSupply);
     }
    
@@ -374,5 +378,8 @@ contract ERC20TokenFactory {
     }
     function getTokenInfo() public view returns (string memory _name, string memory _symbol, uint256 _totalSupply){
         return (token.name(),token.symbol(),token.totalSupply());
+    }
+    function getTokenOwner() public view returns (address){
+        return token.owner();
     }
 }

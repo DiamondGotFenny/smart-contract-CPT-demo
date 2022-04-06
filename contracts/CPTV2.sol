@@ -25,10 +25,10 @@ contract ERC20 is Context,IERC20, IERC20Metadata {
      * All two of these values are immutable: they can only be set once during
      * construction.
      */
-    constructor(string memory name_, string memory symbol_,address owner) {
+    constructor(string memory name_, string memory symbol_,address tokenOwner) {
         _name = name_;
         _symbol = symbol_;
-        _owner=owner;
+        _owner=tokenOwner;
     }
 
 /**
@@ -101,8 +101,8 @@ contract ERC20 is Context,IERC20, IERC20Metadata {
     /**
      * @dev See {IERC20-allowance}.
      */
-    function allowance(address owner, address spender) public view virtual override returns (uint256) {
-        return _allowances[owner][spender];
+    function allowance(address tokenOwner, address spender) public view virtual override returns (uint256) {
+        return _allowances[tokenOwner][spender];
     }
 
     /**
@@ -290,19 +290,19 @@ contract ERC20 is Context,IERC20, IERC20Metadata {
      * - `spender` cannot be the zero address.
      */
     function _approve(
-        address owner,
+        address tokenOwner,
         address spender,
         uint256 amount
     ) internal virtual {
-        require(owner != address(0), "ERC20: approve from the zero address");
+        require(tokenOwner != address(0), "ERC20: approve from the zero address");
         require(spender != address(0), "ERC20: approve to the zero address");
 
-        _allowances[owner][spender] = amount;
-        emit Approval(owner, spender, amount);
+        _allowances[tokenOwner][spender] = amount;
+        emit Approval(tokenOwner, spender, amount);
     }
 
     /**
-     * @dev Updates `owner` s allowance for `spender` based on spent `amount`.
+     * @dev Updates `tokenOwner` s allowance for `spender` based on spent `amount`.
      *
      * Does not update the allowance amount in case of infinite allowance.
      * Revert if not enough allowance is available.
@@ -310,15 +310,15 @@ contract ERC20 is Context,IERC20, IERC20Metadata {
      * Might emit an {Approval} event.
      */
     function _spendAllowance(
-        address owner,
+        address tokenOwner,
         address spender,
         uint256 amount
     ) internal virtual {
-        uint256 currentAllowance = allowance(owner, spender);
+        uint256 currentAllowance = allowance(tokenOwner, spender);
         if (currentAllowance != type(uint256).max) {
             require(currentAllowance >= amount, "ERC20: insufficient allowance");
             unchecked {
-                _approve(owner, spender, currentAllowance - amount);
+                _approve(tokenOwner, spender, currentAllowance - amount);
             }
         }
     }
@@ -367,19 +367,32 @@ contract ERC20 is Context,IERC20, IERC20Metadata {
 contract ERC20TokenFactory {
     ERC20 token;
  
+    struct Vendor{
+        address account;
+        bool isExist;
+        ERC20 coupon;
+    }
+
+   mapping(address=>Vendor) vendors;
+
     function createToken(string memory _name, string memory _symbol, uint256 _totalSupply) public  {
-        token= new ERC20(_name, _symbol,msg.sender);
-        token._mint(msg.sender, _totalSupply);
+        require(vendors[msg.sender].isExist==false,"vendor already exist!");
+        vendors[msg.sender].coupon= new ERC20(_name, _symbol,msg.sender);
+        vendors[msg.sender].coupon._mint(msg.sender, _totalSupply);
+         vendors[msg.sender].isExist=true;
     }
    
    
-    function getBalance(address owner) public view returns (uint256){
-        return token.balanceOf(owner);
+    function getBalance(address owner) public view  returns (uint256)  {
+        require(vendors[owner].isExist,"No such vendor");
+        return vendors[owner].coupon.balanceOf(owner);
     }
-    function getTokenInfo() public view returns (string memory _name, string memory _symbol, uint256 _totalSupply){
-        return (token.name(),token.symbol(),token.totalSupply());
+    function getTokenInfo(address vendor) public view returns (string memory _name, string memory _symbol, uint256 _totalSupply)  {
+         require(vendors[vendor].isExist,"No such vendor");
+        return ( vendors[vendor].coupon.name(), vendors[vendor].coupon.symbol(), vendors[vendor].coupon.totalSupply());
     }
-    function getTokenOwner() public view returns (address){
-        return token.owner();
+    function getTokenOwner(address vendor) public view  returns (address){
+        require(vendors[vendor].isExist,"No such vendor");
+        return  vendors[vendor].coupon.owner();
     }
 }

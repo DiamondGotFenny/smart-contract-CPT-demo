@@ -365,15 +365,31 @@ contract ERC20 is Context,IERC20, IERC20Metadata {
 }
 
 contract ERC20TokenFactory {
-    ERC20 token;
- 
     struct Vendor{
         address account;
         bool isExist;
         ERC20 coupon;
+        mapping(uint=>Product) products;
+         uint[] productIdList;
+        Consumer[] consumerList;
+    }
+
+    struct Consumer {
+        Product purchasedProdcut; //which product the comsumer purchased
+        bool notSpent; //the customer already spent coupon or not
+        address id;
+    }
+
+    struct Product {
+        string name;
+        uint id;
+        uint256 price;
+        uint256 stock; 
+        bool _exist;
     }
 
    mapping(address=>Vendor) vendors;
+    event productSet(Product product,address vendor);
 
     function createToken(string memory _name, string memory _symbol, uint256 _totalSupply) public  {
         require(vendors[msg.sender].isExist==false,"vendor already exist!");
@@ -383,16 +399,42 @@ contract ERC20TokenFactory {
     }
    
    
-    function getBalance(address owner) public view  returns (uint256)  {
-        require(vendors[owner].isExist,"No such vendor");
-        return vendors[owner].coupon.balanceOf(owner);
+    function getBalance(address _vendorArds) public view  returns (uint256)  {
+        return vendors[_vendorArds].coupon.balanceOf(_vendorArds);
     }
-    function getTokenInfo(address vendor) public view returns (string memory _name, string memory _symbol, uint256 _totalSupply)  {
-         require(vendors[vendor].isExist,"No such vendor");
-        return ( vendors[vendor].coupon.name(), vendors[vendor].coupon.symbol(), vendors[vendor].coupon.totalSupply());
+    function getTokenInfo(address _vendorArds) public view returns (string memory _name, string memory _symbol, uint256 _totalSupply)  {
+         require(vendors[_vendorArds].isExist,"No such vendor");
+        return ( vendors[_vendorArds].coupon.name(), vendors[_vendorArds].coupon.symbol(), vendors[_vendorArds].coupon.totalSupply());
     }
-    function getTokenOwner(address vendor) public view  returns (address){
-        require(vendors[vendor].isExist,"No such vendor");
-        return  vendors[vendor].coupon.owner();
+    function getTokenOwner(address _vendorArds) public view  returns (address){
+         require(vendors[_vendorArds].isExist,"No such vendor");
+        return  vendors[_vendorArds].coupon.owner();
+    }
+    function setProduct(string memory name,uint id,uint256 price,uint256 stock)external{
+        require(vendors[msg.sender].isExist,"You are not a vendor!");
+        require(vendors[msg.sender].products[id]._exist==false,"This product is already exist!");
+        vendors[msg.sender].products[id]=Product(name,id,price,stock,true);
+         vendors[msg.sender].productIdList.push(id);
+         emit productSet(vendors[msg.sender].products[id],msg.sender);
+    }
+
+//we may not need to handle the fetch of all products in contract
+    //we can store the products data off-chain 
+    //fetch those data in the front end by looping the productIdList.
+    function getProductIDList(address _vendorArds) public view returns(uint[] memory){
+        require(vendors[_vendorArds].isExist,"No such vendor!");
+        uint[] memory productIdList=vendors[_vendorArds].productIdList;
+        return productIdList;
+    }
+
+    function getProducts(address _vendorArds) public view returns (Product[] memory products){
+        require(vendors[_vendorArds].isExist,"No such vendor!");
+        uint[] memory productIdList=vendors[_vendorArds].productIdList;
+       Product[] memory Iproducts= new Product[](productIdList.length); 
+       for (uint i = 0; i <productIdList.length; i++) {
+          Product memory Iproduct = vendors[_vendorArds].products[productIdList[i]];
+          Iproducts[i] = Iproduct;
+      }
+      return Iproducts;
     }
 }

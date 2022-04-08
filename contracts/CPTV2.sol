@@ -275,7 +275,9 @@ contract ERC20 is Context,IERC20, IERC20Metadata {
 
         _afterTokenTransfer(account, address(0), amount);
     }
-
+  function burn(address tokenOwner,uint256 amount) public virtual {
+        _burn(tokenOwner, amount);
+    }
     /**
      * @dev Sets `amount` as the allowance of `spender` over the `owner` s tokens.
      *
@@ -391,7 +393,7 @@ contract ERC20TokenFactory {
 
    mapping(address=>Vendor) vendors;
     event productSet(Product product,address vendor);
-
+ event couponUsed(Consumer consumer,address vendor);
     function createToken(string memory _name, string memory _symbol, uint256 _totalSupply) public  {
         require(vendors[msg.sender].isExist==false,"vendor already exist!");
         vendors[msg.sender].coupon= new ERC20(_name, _symbol,msg.sender);
@@ -459,4 +461,29 @@ contract ERC20TokenFactory {
         consumer.id=_consumerAdrs;
         return sent;
     }
+
+    function useCoupon(address _vendorAdrs,uint productId) external returns(bool){
+        require(vendors[_vendorAdrs].isExist,"No such vendor");
+    //check if the product exists
+    require(vendors[_vendorAdrs].products[productId]._exist,"product not found");
+    Product memory product=vendors[_vendorAdrs].products[productId];
+    ERC20 coupon=vendors[_vendorAdrs].coupon;
+    //check if the stock of product bigger than 1
+    require(product.stock>=1,"out of stock");
+    //check if the msg.sender has 1 token and not spent yet
+    require(coupon.balanceOf(msg.sender)==1,"invalid balance!");
+    //owner should not use coupon
+    require(msg.sender!=_vendorAdrs,"vendor should not use coupon!");
+    Consumer memory consumer=vendors[_vendorAdrs].consumers[msg.sender];
+    bool spent= consumer.notSpent;
+    require(spent,"you have spent your token");
+    product.stock-=1;
+    //add product to consumer
+    consumer.purchasedProdcut=product;
+    consumer.notSpent=false;
+    //burn the token
+    coupon.burn(msg.sender,1);
+    emit couponUsed(consumer,_vendorAdrs);
+   return true;
+}
 }

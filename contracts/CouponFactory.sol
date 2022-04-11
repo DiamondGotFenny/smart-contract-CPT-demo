@@ -4,6 +4,8 @@ import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
+//this contract is copied from openzeppelin ERC20 contract, but I altered some function to public
+//in order to make them available after it is instantialized in other contract
 contract ERC20 is Context,IERC20, IERC20Metadata {
     mapping(address => uint256) private _balances;
 
@@ -366,14 +368,18 @@ contract ERC20 is Context,IERC20, IERC20Metadata {
     ) internal virtual {}
 }
 
-contract ERC20TokenFactory {
+contract CouponsFactory {
     struct Vendor{
         address account;
-        bool isExist;
+        //check if the vendor exist, instead of using for loop
+        bool _exist;
+        //every vendor has its own token/coupon
         ERC20 coupon;
         mapping(uint=>Product) products;
+        //for getting off-chain product data
         uint[] productIdList;
         mapping(address=>Consumer) consumers;
+        //for getting off-chain consumer data
         address[] consumerIdList;
     }
 
@@ -388,37 +394,45 @@ contract ERC20TokenFactory {
         uint id;
         uint256 price;
         uint256 stock; 
+        //check if the product exist, instead of using for loop
         bool _exist;
     }
 
+    //vendor info, token/coupon info and consumer info must be on chain
    mapping(address=>Vendor) vendors;
+
     event productSet(Product product,address vendor);
- event couponUsed(Consumer consumer,address vendor);
+    event consumerGetCoupon(Consumer consumer,address vendor);
+    event couponUsed(Consumer consumer,address vendor);
+
+    //vendor can create its own token by calling this method
     function createToken(string memory _name, string memory _symbol, uint256 _totalSupply) public  {
-        require(vendors[msg.sender].isExist==false,"vendor already exist!");
+        require(vendors[msg.sender]._exist==false,"vendor already exist!");
         vendors[msg.sender].coupon= new ERC20(_name, _symbol,msg.sender);
         vendors[msg.sender].coupon._mint(msg.sender, _totalSupply);
-         vendors[msg.sender].isExist=true;
+        //vendor can only be on vendors list by creating its own token
+         vendors[msg.sender]._exist=true;
     }
    
-   
     function getBalance(address _vendorAdrs,address owner) public view  returns (uint256)  {
-         require(vendors[_vendorAdrs].isExist,"No such vendor");
+         require(vendors[_vendorAdrs]._exist,"No such vendor");
         return vendors[_vendorAdrs].coupon.balanceOf(owner);
     }
     function getTokenInfo(address _vendorAdrs) public view returns (string memory _name, string memory _symbol, uint256 _totalSupply)  {
-         require(vendors[_vendorAdrs].isExist,"No such vendor");
+         require(vendors[_vendorAdrs]._exist,"No such vendor");
          ERC20 coupon=vendors[_vendorAdrs].coupon;
         return ( coupon.name(), coupon.symbol(), coupon.totalSupply());
     }
     function getTokenOwner(address _vendorAdrs) public view  returns (address){
-         require(vendors[_vendorAdrs].isExist,"No such vendor");
+         require(vendors[_vendorAdrs]._exist,"No such vendor");
         return  vendors[_vendorAdrs].coupon.owner();
     }
     function setProduct(string memory name,uint id,uint256 price,uint256 stock)external{
-        require(vendors[msg.sender].isExist,"You are not a vendor!");
+        //only vendor can set product to its products list
+        require(vendors[msg.sender]._exist,"You are not a vendor!");
         require(vendors[msg.sender].products[id]._exist==false,"This product is already exist!");
         vendors[msg.sender].products[id]=Product(name,id,price,stock,true);
+        //set product id list for getting off chain products list
          vendors[msg.sender].productIdList.push(id);
          emit productSet(vendors[msg.sender].products[id],msg.sender);
     }
@@ -427,13 +441,13 @@ contract ERC20TokenFactory {
     //we can store the products data off-chain 
     //fetch those data in the front end by looping the productIdList.
     function getProductIDList(address _vendorAdrs) public view returns(uint[] memory){
-        require(vendors[_vendorAdrs].isExist,"No such vendor!");
+        require(vendors[_vendorAdrs]._exist,"No such vendor!");
         uint[] memory productIdList=vendors[_vendorAdrs].productIdList;
         return productIdList;
     }
 
     function getProducts(address _vendorAdrs) public view returns (Product[] memory products){
-        require(vendors[_vendorAdrs].isExist,"No such vendor!");
+        require(vendors[_vendorAdrs]._exist,"No such vendor!");
         uint[] memory productIdList=vendors[_vendorAdrs].productIdList;
        Product[] memory Iproducts= new Product[](productIdList.length); 
        for (uint i = 0; i <productIdList.length; i++) {
@@ -448,22 +462,24 @@ contract ERC20TokenFactory {
          require(_consumerAdrs != address(0), "invalid address");
         //check if the receipient is the owner or not
         require(_consumerAdrs!=_vendorAdrs,"don't send coupon to the vendor!");
-        require(vendors[_vendorAdrs].isExist,"No such vendor");
+        require(vendors[_vendorAdrs]._exist,"No such vendor");
          ERC20 coupon=vendors[_vendorAdrs].coupon;
         //check if consumer already has token or not
         require(coupon.balanceOf(_consumerAdrs)==0,"You already have the coupon!");
-        //check if the balance of owner >=1
+        //check if the balance of vendor >=1
         require(coupon.balanceOf( _vendorAdrs)>=1,"Not enough coupon!");
        (bool sent) =coupon.transfer(_consumerAdrs,1);
         require(sent, "Failed to buy the coupon");
+        //create a consumer in vendor's consumers list
         Consumer storage consumer =vendors[_vendorAdrs].consumers[_consumerAdrs];
         consumer.notSpent=true;
         consumer.id=_consumerAdrs;
+        emit consumerGetCoupon(consumer,_vendorAdrs);
         return sent;
     }
 
     function useCoupon(address _vendorAdrs,uint productId) external returns(bool){
-        require(vendors[_vendorAdrs].isExist,"No such vendor");
+        require(vendors[_vendorAdrs]._exist,"No such vendor");
     //check if the product exists
     require(vendors[_vendorAdrs].products[productId]._exist,"product not found");
     Product memory product=vendors[_vendorAdrs].products[productId];
@@ -472,8 +488,9 @@ contract ERC20TokenFactory {
     require(product.stock>=1,"out of stock");
     //check if the msg.sender has 1 token and not spent yet
     require(coupon.balanceOf(msg.sender)==1,"invalid balance!");
-    //owner should not use coupon
+    //vendor should not use coupon
     require(msg.sender!=_vendorAdrs,"vendor should not use coupon!");
+    //the msg.sender can only use its own coupon
     Consumer memory consumer=vendors[_vendorAdrs].consumers[msg.sender];
     bool spent= consumer.notSpent;
     require(spent,"you have spent your token");

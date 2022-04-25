@@ -43,6 +43,7 @@ contract CouponFactory {
     event productSet(Product product,address vendor);
     event consumerGetCoupon(Consumer consumer,address vendor);
     event couponUsed(Consumer consumer,address vendor);
+    event productDeleted(uint id, address vendor);
 
 //allow vendor reset the token,but the existing consumer will not able to use the previous token
 function resetToken(string memory _name, string memory _symbol, uint256 _tokenSupply) public{
@@ -50,7 +51,6 @@ function resetToken(string memory _name, string memory _symbol, uint256 _tokenSu
      vendors[msg.sender].coupon= new ERC20(_name, _symbol,msg.sender);
     vendors[msg.sender].coupon._mint(msg.sender, _tokenSupply);
 }
-
 
     //function that check if the msg.sender is already a vendor
     function isVendor(address _vendor) public view returns (bool){
@@ -108,6 +108,25 @@ function resetToken(string memory _name, string memory _symbol, uint256 _tokenSu
           Iproducts[i] = Iproduct;
       }
       return Iproducts;
+    }
+
+    function getProductInfo(uint id,address _vendorAdrs) public view returns (bool) {
+            require(vendors[_vendorAdrs]._exist,"No such vendor!");
+            Product memory product= vendors[_vendorAdrs].products[id];
+            return product._exist;
+    }
+
+    //delete product
+    function deleteProduct(uint id,address _vendorAdrs) public returns(bool) {
+        require(vendors[_vendorAdrs]._exist,"No such vendor!");
+        require(vendors[_vendorAdrs].products[id]._exist,"No such product!");
+        vendors[_vendorAdrs].products[id].name="";
+        vendors[_vendorAdrs].products[id].id=0;
+        vendors[_vendorAdrs].products[id].price=0;
+        vendors[_vendorAdrs].products[id].stock=0;
+        vendors[_vendorAdrs].products[id]._exist=false;
+        emit productDeleted(id, _vendorAdrs);
+        return true;
     }
 
    //consumer get token,one address is allowed to get one token/coupon only
